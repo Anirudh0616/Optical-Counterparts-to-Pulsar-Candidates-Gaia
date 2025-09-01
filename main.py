@@ -3,32 +3,25 @@ from astroquery.gaia import Gaia
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-# -----------------------------
-# 0) Config
-# -----------------------------
 SEARCH_RADIUS = 5 * u.arcsec       # radius for Gaia cone search [2]
 DIST_TOL = 0.2                     # ±20% distance window for candidate match [2]
 
-# -----------------------------
-# 1) Load data with correct headers (per screenshot)
+# 1) Load data
 # Required columns:
 # - 'Name'
 # - 'RA (hh:mm:ss)'
 # - 'DEC (dd:mm:ss)'
 # - 'd (kpc)'
 # -----------------------------
-df = pd.read_csv("pulsar_candidates.csv")  # ensure these headers exist in the CSV [1]
+df = pd.read_csv("pulsar_candidates.csv")
 
 # Clean and convert distance to parsecs
 # If 'd (kpc)' might contain non-numeric characters, strip them first:
-# df["d (kpc)"] = df["d (kpc)"].astype(str).str.replace(r"[^\d.\-eE]", "", regex=True)  # optional cleaning [3]
+# df["d (kpc)"] = df["d (kpc)"].astype(str).str.replace(r"[^\d.\-eE]", "", regex=True)
 
 df["d (kpc)"] = pd.to_numeric(df["d (kpc)"], errors="coerce")                           # numeric kpc [4]
 df["DIST_pc"] = df["d (kpc)"] * 1000.0                                                  # pc from kpc [1]
 
-# -----------------------------
-# 2) Helpers
-# -----------------------------
 def sexa_to_deg(ra_hms: str, dec_dms: str):
     """
     Convert sexagesimal strings:
@@ -75,25 +68,23 @@ def query_gaia(ra_deg: float, dec_deg: float, dist_pc: float,
     return r[mask]
 
 # -----------------------------
-# 3) Run for first pulsar (example)
+# 3) Run for one pulsar - test
 # -----------------------------
-row_idx = 0
-name = df.at[df.index[row_idx], "Name"]                                                 # scalar getter [7]
-ra_hms = df.at[df.index[row_idx], "RA (hh:mm:ss)"]
-print(ra_hms)
-dec_dms = df.at[df.index[row_idx], "DEC (dd:mm:ss)"]
-print(dec_dms)
-dist_pc = float(df.at[df.index[row_idx], "DIST_pc"])                                    # numeric scalar [7]
-
-ra_deg, dec_deg = sexa_to_deg(ra_hms, dec_dms)                                          # parse to degrees [5]
-print(f"Checking {name} at distance {dist_pc:.1f} pc")                                  # scalar formatting [8]
-
-results = query_gaia(ra_deg, dec_deg, dist_pc)
-print(results)
-
-# -----------------------------
-# 4) (Optional) Loop all pulsars and collect matches
-# -----------------------------
+# row_idx = 0
+# name = df.at[df.index[row_idx], "Name"]                                                 # scalar getter [7]
+# ra_hms = df.at[df.index[row_idx], "RA (hh:mm:ss)"]
+# print(ra_hms)
+# dec_dms = df.at[df.index[row_idx], "DEC (dd:mm:ss)"]
+# print(dec_dms)
+# dist_pc = float(df.at[df.index[row_idx], "DIST_pc"])                                    # numeric scalar [7]
+#
+# ra_deg, dec_deg = sexa_to_deg(ra_hms, dec_dms)                                          # parse to degrees [5]
+# print(f"Checking {name} at distance {dist_pc:.1f} pc")                                  # scalar formatting [8]
+#
+# results = query_gaia(ra_deg, dec_deg, dist_pc)
+# print(results)
+#
+# 4) Loop all pulsars and collect matches
 matches = []
 for i in range(len(df)):
     name_i = df.at[df.index[i], "Name"]
