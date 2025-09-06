@@ -3,7 +3,7 @@ from astroquery.gaia import Gaia
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
-SEARCH_RADIUS = 5 * u.arcsec       # radius for Gaia cone search [2]
+SEARCH_RADIUS = 2 * u.arcsec       # radius for Gaia cone search [2]
 DIST_TOL = 0.2                     # ±20% distance window for candidate match [2]
 
 # 1) Load data
