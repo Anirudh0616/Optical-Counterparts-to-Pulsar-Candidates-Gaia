@@ -1,7 +1,8 @@
 import pandas as pd
-from astroquery.gaia import Gaia
+from astroquery.gaia import Gaia as gaia
 from astropy.coordinates import SkyCoord
 import astropy.units as u
+print("Started")
 
 arcsec = u.Unit("arcsec")
 hourangle = u.Unit("hourangle")
@@ -25,23 +26,24 @@ df = pd.read_csv("pulsar_candidates.csv")
 df["d (kpc)"] = pd.to_numeric(df["d (kpc)"], errors="coerce")                           # numeric kpc [4]
 df["DIST_pc"] = df["d (kpc)"] * 1000.0                                                  # pc from kpc [1]
 
+print("Defined")
 def sexa_to_deg(ra_hms: str, dec_dms: str):
     """
     Convert sexagesimal strings:
       ra_hms like '00:30:27.6'
       dec_dms like '+06:51:39'
     to ICRS degrees.
+    To be compatible with Gaia
     """
-    c = SkyCoord(ra_hms, dec_dms, unit=(u.hourangle, u.deg), frame="icrs")
+    c = SkyCoord(ra_hms, dec_dms, unit=(hourangle, deg), frame="icrs")
     return c.ra.deg, c.dec.deg  # degrees expected by Gaia [5]
 
-def query_gaia(ra_deg: float, dec_deg: float, dist_pc: float,
-               radius: u.Quantity = SEARCH_RADIUS, tol: float = DIST_TOL):
+def query_gaia(ra_deg: float, dec_deg: float, dist_pc: float, radius: u.Quantity = SEARCH_RADIUS, tol: float = DIST_TOL):
     """
     Query Gaia DR3 around (ra_deg, dec_deg) within 'radius', compute distances from parallax,
     and keep stars within ±tol of dist_pc (pc).
     """
-    coord = SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs")              # ICRS [5]
+    coord = SkyCoord(ra=ra_deg * deg, dec=dec_deg * deg, frame="icrs")              # ICRS [5]
 
     adql = f"""
     SELECT gaia.source_id, gaia.ra, gaia.dec,
@@ -49,10 +51,10 @@ def query_gaia(ra_deg: float, dec_deg: float, dist_pc: float,
     FROM gaiadr3.gaia_source AS gaia
     WHERE 1=CONTAINS(
         POINT('ICRS', gaia.ra, gaia.dec),
-        CIRCLE('ICRS', {coord.ra.deg}, {coord.dec.deg}, {radius.to(u.deg).value})
+        CIRCLE('ICRS', {coord.ra.deg}, {coord.dec.deg}, {radius.to(deg).value})
     )
     """
-    job = Gaia.launch_job(adql)                                                          # DR3 source table [2]
+    job = gaia.launch_job(adql)                            # dr3 source table [2]
     r = job.get_results().to_pandas()
 
     if r.empty:
@@ -69,7 +71,7 @@ def query_gaia(ra_deg: float, dec_deg: float, dist_pc: float,
     lo, hi = (1 - tol) * dist_pc, (1 + tol) * dist_pc
     mask = (r["dist_pc"] >= lo) & (r["dist_pc"] <= hi)
     return r[mask]
-
+print("Functions Defined")
 # -----------------------------
 # 3) Run for one pulsar - test
 # -----------------------------
@@ -89,6 +91,7 @@ def query_gaia(ra_deg: float, dec_deg: float, dist_pc: float,
 #
 # 4) Loop all pulsars and collect matches
 matches = []
+print("Looping")
 for i in range(len(df)):
     name_i = df.at[df.index[i], "Name"]
     ra_i, dec_i = sexa_to_deg(
@@ -102,3 +105,4 @@ for i in range(len(df)):
         matches.append(res_i)
 all_matches = pd.concat(matches, ignore_index=True) if matches else pd.DataFrame()
 all_matches.to_csv("gaia_matches.csv", index=False)
+print("Task Finished, matches saved to /gaia_matches.csv")
