@@ -1,5 +1,7 @@
 import pandas as pd
+import numpy as np
 from astroquery.gaia import Gaia as gaia
+import matplotlib.pyplot as plt
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 print("Started")
@@ -46,8 +48,13 @@ def query_gaia(ra_deg: float, dec_deg: float, dist_pc: float, radius: u.Quantity
     coord = SkyCoord(ra=ra_deg * deg, dec=dec_deg * deg, frame="icrs")              # ICRS [5]
 
     adql = f"""
-    SELECT gaia.source_id, gaia.ra, gaia.dec,
-           gaia.parallax, gaia.phot_g_mean_mag, gaia.bp_rp
+    SELECT
+        gaia.source_id, gaia.ra, gaia.dec,
+        gaia.parallax, gaia.parallax_error,
+        gaia.pmra, gaia.pmdec, gaia.pmra_error, gaia.pmdec_error,
+        gaia.phot_g_mean_mag, gaia.bp_rp,
+        gaia.ruwe, gaia.astrometric_excess_noise,
+        gaia.phot_bp_rp_excess_factor
     FROM gaiadr3.gaia_source AS gaia
     WHERE 1=CONTAINS(
         POINT('ICRS', gaia.ra, gaia.dec),
@@ -61,7 +68,7 @@ def query_gaia(ra_deg: float, dec_deg: float, dist_pc: float, radius: u.Quantity
         return r
 
     # Gaia parallaxes are in milliarcseconds; distance(pc) = 1000 / parallax(mas) [6]
-    r = r[r["parallax"].notna() & (r["parallax"] != 0)]
+    r = r[r["parallax"].notna() & (r["parallax"] > 0)]
     if r.empty:
         return r
 
@@ -99,10 +106,51 @@ for i in range(len(df)):
         df.at[df.index[i], "DEC (dd:mm:ss)"]
     )
     dist_i = float(df.at[df.index[i], "DIST_pc"])
+    pulsar_coord = SkyCoord(ra=ra_i*deg,dec=dec_i*deg)
     res_i = query_gaia(ra_i, dec_i, dist_i)
     if not res_i.empty:
+        #Angular Seperation
+        gaia_coords = SkyCoord(ra=res_i["ra"].values*deg, dec=res_i["dec"].values*deg)
+        res_i["sep_arcsec"] = pulsar_coord.separation(gaia_coords).arcsec
+        
+        #Absolute Magnitude, distance from Gaia Parallax
+        res_i["M_G"] = res_i["phot_g_mean_mag"] - 5 * np.log10(res_i["dist_pc"]/10)
+        
+        # Pulsar Metadata
         res_i = res_i.assign(pulsar=name_i, target_dist_pc=dist_i)
         matches.append(res_i)
-all_matches = pd.concat(matches, ignore_index=True) if matches else pd.DataFrame()
-all_matches.to_csv("gaia_matches.csv", index=False)
+
+#Save Resutls
+if matches:
+    all_matches = pd.concat(matches, ignore_index=True)
+
+    # Save raw matches
+    all_matches.to_csv("gaia_matches_raw.csv", index=False)
+
+    # Apply quality cuts
+    mask = (all_matches["ruwe"] < 1.4) & (all_matches["astrometric_excess_noise"] < 2)
+    filtered = all_matches[mask]
+    filtered.to_csv("gaia_matches_filtered.csv", index=False)
+
+    print(f"Matches found: {len(all_matches)}, after cuts: {len(filtered)}")
+else:
+    print("No matches found.")
+    all_matches = pd.DataFrame()
+
+#quick plots
+# Doesnt matter for now, only have 1 match for 1 pulsar
+
+#if not all_matches.empty:
+#    for pulsar, group in all_matches.groupby("pulsar"):
+#        plt.figure(figsize=(6,5))
+#        plt.scatter(group["bp_rp"], group["M_G"], c=group["sep_arcsec"], cmap="viridis", s=50)
+#        plt.gca().invert_yaxis()
+#        plt.colorbar(label="Separation (arcsec)")
+#        plt.xlabel("BP - RP")
+#        plt.ylabel("Absolute G")
+#        plt.title(f"{pulsar} candidates")
+#        plt.savefig(f"plots/{pulsar}_cmd.png", dpi=150)
+#        plt.close()
+#all_matches = pd.concat(matches, ignore_index=True) if matches else pd.DataFrame()
+#all_matches.to_csv("gaia_matches.csv", index=False)
 print("Task Finished, matches saved to /gaia_matches.csv")
