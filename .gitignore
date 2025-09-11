@@ -2,4 +2,4 @@
 venv/
 .idea/
 try.py
-Reports/
+.DS_Store
