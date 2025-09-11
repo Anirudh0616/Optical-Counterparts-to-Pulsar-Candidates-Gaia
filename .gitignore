@@ -1,3 +1,5 @@
 *.ipynb
 venv/
 .idea/
+try.py
+Reports/

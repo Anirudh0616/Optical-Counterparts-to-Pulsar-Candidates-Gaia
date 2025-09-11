@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from astroquery.gaia import Gaia as gaia
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 print("Started")
@@ -10,8 +10,8 @@ arcsec = u.Unit("arcsec")
 hourangle = u.Unit("hourangle")
 deg = u.Unit("deg")
 
-SEARCH_RADIUS = 2 * arcsec       # radius for Gaia cone search [2]
-DIST_TOL = 0.2                     # ±20% distance window for candidate match [2]
+SEARCH_RADIUS = 3 * arcsec       # radius for Gaia cone search [2]
+DIST_TOL = 0.8                     # ±20% distance window for candidate match [2]
 # 1) Load data
 # Required columns:
 # - 'Name'
@@ -28,7 +28,8 @@ df = pd.read_csv("pulsar_candidates.csv")
 df["d (kpc)"] = pd.to_numeric(df["d (kpc)"], errors="coerce")                           # numeric kpc [4]
 df["DIST_pc"] = df["d (kpc)"] * 1000.0                                                  # pc from kpc [1]
 
-print("Defined")
+print(f"Loaded {len(df)} pulsars")
+print(f"Column names: {df.columns.tolist()}")
 def sexa_to_deg(ra_hms: str, dec_dms: str):
     """
     Convert sexagesimal strings:
@@ -68,11 +69,13 @@ def query_gaia(ra_deg: float, dec_deg: float, dist_pc: float, radius: u.Quantity
         return r
 
     # Gaia parallaxes are in milliarcseconds; distance(pc) = 1000 / parallax(mas) [6]
-    r = r[r["parallax"].notna() & (r["parallax"] > 0)]
+    r = r[r["parallax"].notna() & (r["parallax"] > 0) & (r["parallax_error"]>0)]
+    print(len(r))
     if r.empty:
         return r
 
     r["dist_pc"] = 1000.0 / r["parallax"]                                               # pc from mas [6]
+    r["parallax_snr"] = r["parallax"]/r["parallax_error"]
 
     # Keep only stars close to the pulsar distance
     lo, hi = (1 - tol) * dist_pc, (1 + tol) * dist_pc
@@ -98,7 +101,7 @@ print("Functions Defined")
 #
 # 4) Loop all pulsars and collect matches
 matches = []
-print("Looping")
+print(f"Looping {len(df)} times")
 for i in range(len(df)):
     name_i = df.at[df.index[i], "Name"]
     ra_i, dec_i = sexa_to_deg(
@@ -107,6 +110,7 @@ for i in range(len(df)):
     )
     dist_i = float(df.at[df.index[i], "DIST_pc"])
     pulsar_coord = SkyCoord(ra=ra_i*deg,dec=dec_i*deg)
+    print("Pulsar number: ",i+1)
     res_i = query_gaia(ra_i, dec_i, dist_i)
     if not res_i.empty:
         #Angular Seperation
@@ -153,4 +157,4 @@ else:
 #        plt.close()
 #all_matches = pd.concat(matches, ignore_index=True) if matches else pd.DataFrame()
 #all_matches.to_csv("gaia_matches.csv", index=False)
-print("Task Finished, matches saved to /gaia_matches.csv")
+print("Task Finished, matches saved to /gaia_matches_raw.csv and /gaia_matches_filtered.csv")
