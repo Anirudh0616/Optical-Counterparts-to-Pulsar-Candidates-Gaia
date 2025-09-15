@@ -3,3 +3,5 @@ venv/
 .idea/
 try.py
 .DS_Store
+debug.py
+

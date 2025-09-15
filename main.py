@@ -11,7 +11,7 @@ hourangle = u.Unit("hourangle")
 deg = u.Unit("deg")
 
 SEARCH_RADIUS = 3 * arcsec       # radius for Gaia cone search [2]
-DIST_TOL = 0.8                     # ±20% distance window for candidate match [2]
+DIST_TOL = 0.8                     # ±80% distance window for candidate match [2]
 # 1) Load data
 # Required columns:
 # - 'Name'
@@ -53,7 +53,10 @@ def query_gaia(ra_deg: float, dec_deg: float, dist_pc: float, radius: u.Quantity
         gaia.source_id, gaia.ra, gaia.dec,
         gaia.parallax, gaia.parallax_error,
         gaia.pmra, gaia.pmdec, gaia.pmra_error, gaia.pmdec_error,
-        gaia.phot_g_mean_mag, gaia.bp_rp,
+        gaia.phot_g_mean_mag, gaia.phot_g_mean_flux_error,
+        gaia.phot_bp_mean_mag, gaia.phot_bp_mean_flux_error,
+        gaia.phot_rp_mean_mag, gaia.phot_rp_mean_flux_error,
+        gaia.bp_rp,
         gaia.ruwe, gaia.astrometric_excess_noise,
         gaia.phot_bp_rp_excess_factor
     FROM gaiadr3.gaia_source AS gaia
@@ -157,4 +160,8 @@ else:
 #        plt.close()
 #all_matches = pd.concat(matches, ignore_index=True) if matches else pd.DataFrame()
 #all_matches.to_csv("gaia_matches.csv", index=False)
+
+# # Convert flux errors to magnitude errors
+#magnitude_error = 1.086 * flux_error / flux
+
 print("Task Finished, matches saved to /gaia_matches_raw.csv and /gaia_matches_filtered.csv")
